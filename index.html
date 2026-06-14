@@ -238,7 +238,7 @@ function App() {
   return e(React.Fragment, null,
     e("aside", null,
       e("h2", null, "Bearington Sheet Layout"),
-      e("p", { className: "hint" }, "Drag components inside the Sheet. Positions and sizes live in layout data and autosave to localStorage."),
+      e("p", { className: "hint" }, "Drag components inside the Sheet. Positions and sizes live in layout data and autosave to localStorage. ", e("a", { href: "layout-lab.html", style: { color: "#6f5c25" } }, "Layout Lab →")),
       e("div", { className: "row" },
         e("button", { onClick: () => downloadJSON("bearington-layout.json", layout) }, "Export Layout"),
         e("button", { onClick: reset }, "Reset Layout"),
