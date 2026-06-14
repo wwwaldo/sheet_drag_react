@@ -25,6 +25,10 @@
     .piece:hover { border-color: #7b682fcc; }
     .piece.selected { z-index: 5; border: 2px solid #6f5c25; box-shadow: 0 0 0 3px #fff7cfaa; cursor: grabbing; }
     .badge { position: absolute; left: 2px; top: 2px; background: #fff8eadc; border: 1px solid #7b682f; border-radius: 6px; padding: 2px 5px; font-size: 11px; pointer-events:none; }
+    .piece .arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 6; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #6f5c25; background: #fff8eaee; color: #2d2618; font-size: 20px; line-height: 30px; text-align: center; padding: 0; margin: 0; cursor: pointer; box-shadow: 0 2px 6px #0003; }
+    .piece .arrow:hover { background: #ffe6a3; }
+    .piece .arrow.left { left: 8px; } .piece .arrow.right { right: 8px; }
+    .piece .outfitTag { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 6; background: #fff8eaee; border: 1px solid #7b682f; border-radius: 8px; padding: 2px 8px; font-size: 11px; pointer-events: none; }
     label { display: block; margin: 9px 0; }
     input[type="range"] { width: 100%; }
     select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d8caa8; background: #fffdf5; color: #2d2618; font: inherit; }
@@ -220,7 +224,7 @@ function VariantPicker({ variants, value, onChange }) {
   );
 }
 
-function SheetPiece({ item, selected, showLabels, onSelect, onMove, onUpdate }) {
+function SheetPiece({ item, selected, showLabels, variants, onVariant, onSelect, onMove, onUpdate }) {
   const dragRef = React.useRef(null);
   function pointerDown(ev) {
     ev.preventDefault();
@@ -237,6 +241,10 @@ function SheetPiece({ item, selected, showLabels, onSelect, onMove, onUpdate }) 
     onMove(item.id, nextX, nextY);
   }
   function pointerUp(ev) { dragRef.current = null; onUpdate(); }
+  function cycle(dir, ev) { ev.preventDefault(); ev.stopPropagation(); onVariant(item.id, dir); }
+  const hasVariants = variants && variants.length > 1;
+  const currentVariant = hasVariants ? variants.find(v => v.src === item.src) : null;
+  const arrowProps = onClick => ({ type: "button", onPointerDown: ev => ev.stopPropagation(), onClick });
   return e("div", {
     className: "piece" + (selected ? " selected" : ""),
     style: { left: item.x, top: item.y, width: item.width, height: item.height },
@@ -247,18 +255,21 @@ function SheetPiece({ item, selected, showLabels, onSelect, onMove, onUpdate }) 
     title: item.label
   },
     e("img", { src: item.src, alt: item.label, draggable: false }),
-    showLabels ? e("span", { className: "badge" }, item.label) : null
+    showLabels ? e("span", { className: "badge" }, item.label) : null,
+    hasVariants ? e("button", Object.assign({ className: "arrow left", title: "Previous outfit" }, arrowProps(ev => cycle(-1, ev))), "‹") : null,
+    hasVariants ? e("button", Object.assign({ className: "arrow right", title: "Next outfit" }, arrowProps(ev => cycle(1, ev))), "›") : null,
+    hasVariants && currentVariant ? e("span", { className: "outfitTag" }, currentVariant.label) : null
   );
 }
 
-function Sheet({ layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale }) {
+function Sheet({ layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale, variantsById, onVariant }) {
   function move(id, x, y) { setLayout(prev => prev.map(it => it.id === id ? { ...it, x, y } : it)); }
   function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); }
   React.useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); }, [layout]);
   return e("div", { className: "stageOuter", style: { transform: `scale(${scale})`, transformOrigin: "top left" } },
     e("div", { className: "sheet", onPointerDown: () => setSelectedId(null) },
       e("img", { className: "guide", src: "assets/full-sheet-guide.jpg", style: { opacity: guideOpacity }, alt: "Full sheet background guide" }),
-      layout.map(item => e(SheetPiece, { key: item.id, item, selected: selectedId === item.id, showLabels, onSelect: setSelectedId, onMove: move, onUpdate: save }))
+      layout.map(item => e(SheetPiece, { key: item.id, item, selected: selectedId === item.id, showLabels, variants: variantsById[item.id], onVariant, onSelect: setSelectedId, onMove: move, onUpdate: save }))
     )
   );
 }
@@ -273,6 +284,16 @@ function App() {
   const portrait = layout.find(x => x.id === "portraitFrame");
   const portraitSrc = portrait ? portrait.src : WOODLAND_CREATURE_VARIANTS[0].src;
   function setVariant(src) { setLayout(prev => prev.map(it => it.id === "portraitFrame" ? { ...it, src } : it)); }
+  const variantsById = { portraitFrame: WOODLAND_CREATURE_VARIANTS };
+  function cycleVariant(id, dir) {
+    const variants = variantsById[id]; if (!variants) return;
+    setLayout(prev => prev.map(it => {
+      if (it.id !== id) return it;
+      const i = variants.findIndex(v => v.src === it.src);
+      const next = variants[(((i < 0 ? 0 : i) + dir) % variants.length + variants.length) % variants.length];
+      return { ...it, src: next.src };
+    }));
+  }
   function reset() { setLayout(DEFAULT_LAYOUT.map(x => ({...x}))); localStorage.removeItem(STORAGE_KEY); }
   function patchSelected(patch) { if (!selected) return; setLayout(prev => prev.map(it => it.id === selected.id ? { ...it, ...patch } : it)); }
   function importFile(ev) {
@@ -313,7 +334,7 @@ function App() {
       ))
     ),
     e("main", null,
-      e(Sheet, { layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale })
+      e(Sheet, { layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale, variantsById, onVariant: cycleVariant })
     )
   );
 }
