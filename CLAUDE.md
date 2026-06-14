@@ -55,9 +55,12 @@ pointer events; positions autosave to `localStorage`.
 
 - The 14 numbered subcomponent pieces (`01_header`..`14_notes_box`) were **removed**.
   Their PNG files were deleted from `assets/`.
-- `index.html` now renders just two pieces: an **`outer`** piece loading `assets/outer.jpg`
+- `index.html` now renders just two pieces: an **`outer`** piece loading `assets/outer.png`
   (box 1024×1280, matches its native 1122×1402 aspect 0.800) and the **`portraitFrame`**
   woodland card (still drives the variant picker + arrows).
+- localStorage key is now **`bearington-sheet-layout-v3`**.
+- **Transparency done:** `outer.png` and both woodland PNGs now have a real alpha channel —
+  the white background was knocked out so lower layers show through. See below.
 
 ## Known open items / gotchas
 
@@ -69,17 +72,30 @@ pointer events; positions autosave to `localStorage`.
   and/or set the woodland box to 500×667. User was told about this; awaiting go-ahead.
 - **React app is OUT OF SYNC with root index.html.** `react-app/src/data.js` still has the
   old 14-piece numbered layout (and its own asset copies in `react-app/public/assets/`).
-  The `outer.jpg` change and any woodland fix have NOT been ported there. The last Netlify
-  deploy therefore still shows the numbered layout. Port + redeploy if the user wants parity.
+  NONE of these have been ported there: the `outer.png` piece, the transparency knockout
+  (its woodland PNGs are still the old opaque ones; no outer.png), and the woodland
+  aspect-ratio fix. The last Netlify deploy therefore still shows the old opaque numbered
+  layout. Port + `npm run build` + `netlify deploy --prod --dir=dist` for parity.
 - **`layout.json` (root) is stale** — still lists the deleted numbered assets. It's only a
   reference/import file (not auto-loaded by index.html), so it doesn't break anything.
 
 ## Assets (`assets/`)
 
-`full-sheet-guide.jpg` (1024×1536, the background guide), `outer.jpg` (1122×1402),
-`woodland_cleric_card_variant_a.png` / `_b.png` (both 768×1024). The numbered 01..14 PNGs
-were deleted. `react-app/public/assets/` still contains its own copies of everything,
-including the numbered PNGs.
+`full-sheet-guide.jpg` (1024×1536, the background guide), `outer.jpg` (1122×1402, the
+original opaque source — kept for re-processing), **`outer.png`** (transparent, used by
+index.html), `woodland_cleric_card_variant_a.png` / `_b.png` (768×1024, now with alpha).
+The numbered 01..14 PNGs were deleted. `react-app/public/assets/` still has its own copies
+of everything (numbered PNGs + the OLD opaque woodland PNGs, no outer.png).
+
+### Background-knockout method (transparency)
+
+JPEG has no alpha; the PNGs were exported flat. To make the white background transparent
+we ran a **flood-fill-from-edges white knockout** with Jimp (pure JS, reads JPEG+PNG):
+load image → flood-fill from every border pixel through connected pixels where R,G,B all
+>= 235, setting alpha 0 → feather light fringe pixels adjacent to transparent (kills white
+halo). Flood-fill (not global) preserves cream/parchment box interiors (tan, blue<235) that
+are enclosed by borders. Script lived at `/tmp/knockout/knockout.js` (scratch, not in repo).
+Re-run from `assets/outer.jpg` and the original woodland sources if you need to redo it.
 
 ## How to test (no test framework; use headless Chrome)
 
