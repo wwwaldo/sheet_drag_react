@@ -1,0 +1,15 @@
+# Root config used by Netlify's git-connected continuous deployment.
+# The React app lives in react-app/, so the build base points there.
+[build]
+  base = "react-app"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback so deep links like /layout-lab resolve to the app.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
