@@ -46,6 +46,7 @@
 const e = React.createElement;
 const FIELDS_KEY = "bearington-outer-fields-v1";
 const PORTRAIT_KEY = "bearington-portrait-v1";
+const LAYOUT_KEY = "bearington-outer-layout-v1";
 const VB_W = 1122, VB_H = 1630;
 const PORTRAIT = { x: 224, y: 250, w: 548, h: 720 };
 const VARIANTS = [{"label": "Variant A", "src": "assets/woodland_cleric_card_variant_a.png"}, {"label": "Variant B", "src": "assets/woodland_cleric_card_variant_b.png"}, {"label": "Variant C", "src": "assets/woodland_cleric_card_variant_c.png"}, {"label": "Warrior", "src": "assets/woodland_warrior_bramble_variant_a.png"}];
@@ -64,48 +65,81 @@ function VariantPicker({ variants, value, onChange }) {
   );
 }
 
-function Sheet({ portraitSrc, values, setValue, scale }) {
+function svgPoint(ev) {
+  const svg = ev.currentTarget.ownerSVGElement;
+  const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function Field({ f, pos, value, setValue, setFieldPos }) {
+  const drag = React.useRef(null);
+  function down(ev) {
+    if (!ev.shiftKey) return;            // plain click -> focus & type
+    ev.preventDefault(); ev.stopPropagation();
+    const p = svgPoint(ev);
+    drag.current = { sx: p.x, sy: p.y, ox: pos.x, oy: pos.y };
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (err) {}
+  }
+  function move(ev) {
+    const d = drag.current; if (!d) return;
+    const p = svgPoint(ev);
+    setFieldPos(f.id, Math.round(d.ox + (p.x - d.sx)), Math.round(d.oy + (p.y - d.sy)));
+  }
+  function up() { drag.current = null; }
+  return e("g", { transform: `translate(${pos.x},${pos.y})`, className: "fieldG",
+      onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up },
+    e("foreignObject", { x: 0, y: 0, width: f.w, height: f.h },
+      e("input", { className: "fieldInput", type: "text", value: value || "", placeholder: f.label,
+        title: f.label + " — Shift+drag to move", onChange: ev => setValue(f.id, ev.target.value) })
+    )
+  );
+}
+
+function Sheet({ portraitSrc, values, setValue, layout, setFieldPos, scale }) {
   return e("div", { className: "stageOuter", style: { transform: `scale(${scale})` } },
     e("svg", { className: "sheetSvg", width: VB_W, height: VB_H, viewBox: `0 0 ${VB_W} ${VB_H}`, xmlns: "http://www.w3.org/2000/svg" },
       e("image", { href: "assets/outer_bg.png", x: 0, y: 0, width: VB_W, height: VB_H, preserveAspectRatio: "none" }),
       e("image", { href: portraitSrc, x: PORTRAIT.x, y: PORTRAIT.y, width: PORTRAIT.w, height: PORTRAIT.h, preserveAspectRatio: "xMidYMid meet" }),
-      FIELDS.map(f => e("foreignObject", { key: f.id, x: f.x, y: f.y, width: f.w, height: f.h },
-        e("input", { className: "fieldInput", type: "text", value: values[f.id] || "", placeholder: f.label,
-          title: f.label, onChange: ev => setValue(f.id, ev.target.value) })
-      ))
+      FIELDS.map(f => e(Field, { key: f.id, f, pos: layout[f.id] || { x: f.x, y: f.y }, value: values[f.id], setValue, setFieldPos }))
     )
   );
 }
 
 function App() {
   const [values, setValues] = React.useState(() => loadJSON(FIELDS_KEY, {}));
+  const [layout, setLayout] = React.useState(() => loadJSON(LAYOUT_KEY, {}));
   const [portraitSrc, setPortraitSrc] = React.useState(() => loadJSON(PORTRAIT_KEY, VARIANTS[0].src));
   const [scale, setScale] = React.useState(0.62);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   React.useEffect(() => { document.getElementById("root").classList.toggle("collapsed", !sidebarOpen); }, [sidebarOpen]);
   React.useEffect(() => { localStorage.setItem(FIELDS_KEY, JSON.stringify(values)); }, [values]);
+  React.useEffect(() => { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); }, [layout]);
   React.useEffect(() => { localStorage.setItem(PORTRAIT_KEY, JSON.stringify(portraitSrc)); }, [portraitSrc]);
 
   function setValue(id, v) { setValues(prev => ({ ...prev, [id]: v })); }
+  function setFieldPos(id, x, y) { setLayout(prev => ({ ...prev, [id]: { x, y } })); }
   function clearFields() { if (confirm("Clear all field text?")) setValues({}); }
+  function resetPositions() { if (confirm("Reset all field positions?")) setLayout({}); }
 
   return e(React.Fragment, null,
     !sidebarOpen ? e("button", { className: "sidebarToggle", onClick: () => setSidebarOpen(true), title: "Show sidebar" }, "☰ Menu") : null,
     e("aside", null,
       e("button", { className: "collapseBtn", onClick: () => setSidebarOpen(false), title: "Collapse sidebar" }, "« Hide"),
       e("h2", null, "Bearington Character Sheet"),
-      e("p", { className: "hint" }, "Click a line on the sheet and type. Text and portrait choice autosave to this browser. ", e("a", { href: "layout-lab.html" }, "Layout Lab →")),
+      e("p", { className: "hint" }, "Click a line and type. ", e("strong", null, "Shift+drag"), " a field to move it. Text, positions, and portrait autosave to this browser. ", e("a", { href: "layout-lab.html" }, "Layout Lab →")),
       e("h3", null, "Character Portrait"),
       e("p", { className: "hint" }, "Choose the portrait shown in the sheet frame."),
       e(VariantPicker, { variants: VARIANTS, value: portraitSrc, onChange: setPortraitSrc }),
       e("h3", null, "Sheet"),
       e("label", null, `Zoom ${scale.toFixed(2)}×`, e("input", { type: "range", min: 0.3, max: 1.1, step: 0.05, value: scale, onChange: ev => setScale(Number(ev.target.value)) })),
       e("div", { className: "row" },
-        e("button", { onClick: clearFields }, "Clear fields")
+        e("button", { onClick: clearFields }, "Clear fields"),
+        e("button", { onClick: resetPositions }, "Reset positions")
       ),
-      e("p", { className: "hint" }, `${FIELDS.length} editable fields.`)
+      e("p", { className: "hint" }, `${FIELDS.length} editable fields. Shift+drag to reposition.`)
     ),
-    e("main", null, e(Sheet, { portraitSrc, values, setValue, scale }))
+    e("main", null, e(Sheet, { portraitSrc, values, setValue, layout, setFieldPos, scale }))
   );
 }
 ReactDOM.createRoot(document.getElementById("root")).render(e(App));

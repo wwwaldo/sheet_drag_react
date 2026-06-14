@@ -17,10 +17,13 @@ inline `<svg>` (viewBox `0 0 1122 1630`) with:
   array (each `{id,x,y,w,h,label}`). Values + portrait choice autosave to localStorage
   (`bearington-outer-fields-v1`, `bearington-portrait-v1`).
 
-### Repositioning fields / portrait (done in code, "via clood code")
-There is intentionally NO in-browser drag. To move things, edit `index.html`:
-- a field → change its `{x,y,w,h}` in the `FIELDS` array;
-- the portrait → change the `PORTRAIT` constant.
+### Repositioning fields / portrait
+Two ways:
+- **In-browser: Shift+drag** a field to move it (plain click = type). Positions save to
+  localStorage `bearington-outer-layout-v1`; "Reset positions" in the sidebar clears them.
+  Drag math uses the SVG `getScreenCTM()` so it's correct at any zoom.
+- **In code:** edit `index.html` — a field's default `{x,y,w,h}` in the `FIELDS` array, or
+  the `PORTRAIT` constant. (Code defaults; a saved drag layout overrides them per-browser.)
 The `FIELDS` array was generated from `outer.svg`'s `<g class="field" data-id data-default-x/y>`
 groups (x,y already include the hitbox offset: `x = default-x - 4`, `y = default-y - 22`,
 w=270/h=26 typical). The viewBox height is 1630 because the field coords were authored in a
