@@ -28,6 +28,12 @@
     label { display: block; margin: 9px 0; }
     input[type="range"] { width: 100%; }
     select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d8caa8; background: #fffdf5; color: #2d2618; font: inherit; }
+    .variantPicker { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+    .variantOption { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border: 1px solid #d8caa8; border-radius: 10px; background: #fffdf5; cursor: pointer; width: 94px; margin: 0; font: inherit; }
+    .variantOption img { width: 80px; height: 80px; object-fit: contain; border-radius: 6px; background: #efe0bc; }
+    .variantOption span { font-size: 11px; opacity: .82; }
+    .variantOption:hover { background: #ffe6a3; }
+    .variantOption.active { outline: 2px solid #8b7650; border-color: #8b7650; background: #ffe6a3; }
     .resizePanel { display:grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
     .resizePanel input { width: 100%; padding: 6px; border-radius: 8px; border: 1px solid #d8caa8; background:#fffdf5; }
     @media (max-width: 900px) { #root { grid-template-columns: 1fr; } aside { height: auto; border-right: 0; border-bottom: 1px solid #d8caa8; } }
@@ -198,6 +204,22 @@ function loadInitialLayout() {
   catch { return DEFAULT_LAYOUT; }
 }
 
+function VariantPicker({ variants, value, onChange }) {
+  return e("div", { className: "variantPicker" },
+    variants.map(variant => e("button", {
+      key: variant.src,
+      type: "button",
+      className: "variantOption" + (variant.src === value ? " active" : ""),
+      title: variant.label,
+      "aria-pressed": variant.src === value,
+      onClick: () => onChange(variant.src)
+    },
+      e("img", { src: variant.src, alt: variant.label, draggable: false }),
+      e("span", null, variant.label)
+    ))
+  );
+}
+
 function SheetPiece({ item, selected, showLabels, onSelect, onMove, onUpdate }) {
   const dragRef = React.useRef(null);
   function pointerDown(ev) {
@@ -248,6 +270,9 @@ function App() {
   const [showLabels, setShowLabels] = React.useState(true);
   const [scale, setScale] = React.useState(0.7);
   const selected = layout.find(x => x.id === selectedId);
+  const portrait = layout.find(x => x.id === "portraitFrame");
+  const portraitSrc = portrait ? portrait.src : WOODLAND_CREATURE_VARIANTS[0].src;
+  function setVariant(src) { setLayout(prev => prev.map(it => it.id === "portraitFrame" ? { ...it, src } : it)); }
   function reset() { setLayout(DEFAULT_LAYOUT.map(x => ({...x}))); localStorage.removeItem(STORAGE_KEY); }
   function patchSelected(patch) { if (!selected) return; setLayout(prev => prev.map(it => it.id === selected.id ? { ...it, ...patch } : it)); }
   function importFile(ev) {
@@ -271,16 +296,11 @@ function App() {
       e("label", null, "Background guide opacity ", e("input", { type: "range", min: 0, max: 1, step: 0.01, value: guideOpacity, onChange: ev => setGuideOpacity(Number(ev.target.value)) })),
       e("label", null, "Canvas zoom ", e("input", { type: "range", min: 0.25, max: 1.25, step: 0.05, value: scale, onChange: ev => setScale(Number(ev.target.value)) })),
       e("label", null, e("input", { type: "checkbox", checked: showLabels, onChange: ev => setShowLabels(ev.target.checked) }), " Show labels"),
+      e("h3", null, "Woodland Creature"),
+      e("p", { className: "hint" }, "Pick the artwork loaded into the portrait frame."),
+      e(VariantPicker, { variants: WOODLAND_CREATURE_VARIANTS, value: portraitSrc, onChange: setVariant }),
       selected ? e("div", null,
         e("h3", null, "Selected: ", selected.label),
-        selected.id === "portraitFrame" ? e("label", null, "Woodland creature artwork ",
-          e("select", {
-            value: selected.src,
-            onChange: ev => patchSelected({ src: ev.target.value })
-          }, WOODLAND_CREATURE_VARIANTS.map(variant =>
-            e("option", { key: variant.src, value: variant.src }, variant.label)
-          ))
-        ) : null,
         e("div", { className: "resizePanel" },
           ["x","y","width","height"].map(key => e("label", { key }, key, e("input", { type:"number", value:selected[key], onChange: ev => patchSelected({ [key]: Number(ev.target.value) }) })))
         )
