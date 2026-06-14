@@ -5,7 +5,32 @@ For full project state/architecture see [CLAUDE.md](CLAUDE.md).
 
 ---
 
-## Moving the text fields in `outer.svg`
+## index.html is now an inline editable sheet (not draggable pieces)
+
+`index.html` was rebuilt: instead of the old draggable-PNG-pieces sheet, it renders ONE
+inline `<svg>` (viewBox `0 0 1122 1630`) with:
+- the clean background art `assets/outer_bg.png` (the transparent knockout extracted from
+  `outer.svg`), stretched to fill the viewBox;
+- the **character portrait** as an `<image>` placed by the `PORTRAIT = {x,y,w,h}` constant —
+  it lives *inside* the SVG and is swapped by the variant picker (`WOODLAND_CREATURE_VARIANTS`);
+- **71 editable text fields** as `<foreignObject>` HTML `<input>`s, defined by the `FIELDS`
+  array (each `{id,x,y,w,h,label}`). Values + portrait choice autosave to localStorage
+  (`bearington-outer-fields-v1`, `bearington-portrait-v1`).
+
+### Repositioning fields / portrait (done in code, "via clood code")
+There is intentionally NO in-browser drag. To move things, edit `index.html`:
+- a field → change its `{x,y,w,h}` in the `FIELDS` array;
+- the portrait → change the `PORTRAIT` constant.
+The `FIELDS` array was generated from `outer.svg`'s `<g class="field" data-id data-default-x/y>`
+groups (x,y already include the hitbox offset: `x = default-x - 4`, `y = default-y - 22`,
+w=270/h=26 typical). The viewBox height is 1630 because the field coords were authored in a
+taller space than the 1402-tall embedded PNG; stretching the bg to 1630 realigns them.
+Regenerate by re-parsing `outer.svg` if its field layout changes.
+
+## Moving the text fields in `outer.svg` (the standalone interactive file)
+
+(Applies to opening `outer.svg` directly — index.html no longer embeds the interactive svg.)
+
 
 `assets/outer.svg` is a **self-contained interactive fillable sheet**, not a plain image. It
 has an embedded `<script>` (CDATA) that lets you fill and reposition the form fields. Each
