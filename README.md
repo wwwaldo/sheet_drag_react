@@ -1,5 +1,16 @@
 # Bearington Draggable Sheet
 
+**Live (React build on Netlify): https://bearington-sheet-react.netlify.app**
+
+Two ways to run this project:
+
+- **`react-app/`** — a proper Vite + React build (JSX, React Router) deployed to Netlify.
+  Run `cd react-app && npm install && npm run dev`.
+- **Root `index.html` / `layout-lab.html`** — the original no-build, single-file CDN-React
+  versions, served via GitHub Pages.
+
+## No-build version
+
 Open `index.html` in a browser. It uses React from a CDN, so internet access is needed for the no-build version.
 
 Drag sheet subcomponents around the full-sheet guide. Layout autosaves to localStorage. Export/import layout JSON from the sidebar.

@@ -1,0 +1,58 @@
+export const STORAGE_KEY = "bearington-sheet-layout-v1";
+
+export const WOODLAND_CREATURE_VARIANTS = [
+  { label: "Variant A", src: "/assets/woodland_cleric_card_variant_a.png" },
+  { label: "Variant B", src: "/assets/woodland_cleric_card_variant_b.png" },
+];
+
+export const DEFAULT_LAYOUT = [
+  { id: "header", label: "01 Header", src: "/assets/01_header.png", x: 0, y: 0, width: 370, height: 215 },
+  { id: "identity", label: "02 Identity Box", src: "/assets/02_identity_box.png", x: 385, y: 20, width: 320, height: 225 },
+  { id: "vitals", label: "03 Vitals Box", src: "/assets/03_vitals_box.png", x: 725, y: 20, width: 290, height: 235 },
+  { id: "abilities", label: "04 Abilities Column", src: "/assets/04_abilities_column.png", x: 18, y: 250, width: 180, height: 525 },
+  { id: "portraitFrame", label: "05 Woodland Creature", src: "/assets/woodland_cleric_card_variant_a.png", x: 205, y: 250, width: 500, height: 525 },
+  { id: "traits", label: "06 Traits Box", src: "/assets/06_traits_box.png", x: 720, y: 260, width: 295, height: 525 },
+  { id: "attacks", label: "07 Attacks & Cantrips", src: "/assets/07_attacks_cantrips_box.png", x: 218, y: 910, width: 500, height: 205 },
+  { id: "features", label: "08 Features Box", src: "/assets/08_features_box.png", x: 720, y: 785, width: 295, height: 290 },
+  { id: "miscStats", label: "09 Misc Stats Box", src: "/assets/09_misc_stats_box.png", x: 18, y: 915, width: 185, height: 190 },
+  { id: "proficiencies", label: "10 Proficiencies Box", src: "/assets/10_proficiencies_box.png", x: 215, y: 1120, width: 170, height: 390 },
+  { id: "equipment", label: "11 Equipment Box", src: "/assets/11_equipment_box.png", x: 18, y: 1120, width: 185, height: 390 },
+  { id: "spellcasting", label: "12 Spellcasting Box", src: "/assets/12_spellcasting_box.png", x: 385, y: 1120, width: 330, height: 390 },
+  { id: "channelDivinity", label: "13 Channel Divinity", src: "/assets/13_channel_divinity_box.png", x: 720, y: 1090, width: 295, height: 185 },
+  { id: "notes", label: "14 Notes Box", src: "/assets/14_notes_box.png", x: 720, y: 1280, width: 295, height: 245 },
+];
+
+export const SHEET_W = 1024;
+export const SHEET_H = 1536;
+
+export function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+export function downloadBlob(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+export function downloadJSON(filename, data) {
+  downloadBlob(filename, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+}
+
+// Keep the portrait piece pointed at a known woodland variant.
+export function normalizeLayout(layout) {
+  return layout.map((item) => {
+    if (item.id !== "portraitFrame") return item;
+    const match = WOODLAND_CREATURE_VARIANTS.find((v) => v.src === item.src);
+    return { ...item, label: "05 Woodland Creature", src: match ? match.src : WOODLAND_CREATURE_VARIANTS[0].src };
+  });
+}
+
+export function loadInitialLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return saved ? normalizeLayout(saved) : DEFAULT_LAYOUT;
+  } catch {
+    return DEFAULT_LAYOUT;
+  }
+}
