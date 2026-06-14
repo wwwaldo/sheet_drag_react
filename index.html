@@ -8,6 +8,10 @@
     * { box-sizing: border-box; }
     body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4ecd9; color: #2d2618; }
     #root { min-height: 100vh; display: grid; grid-template-columns: 320px 1fr; }
+    #root.collapsed { grid-template-columns: 1fr; }
+    #root.collapsed aside { display: none; }
+    .collapseBtn { float: right; padding: 4px 9px; margin: 0; }
+    .sidebarToggle { position: fixed; top: 12px; left: 12px; z-index: 100; box-shadow: 0 2px 8px #0004; }
     aside { padding: 16px; background: #fff8ea; border-right: 1px solid #d8caa8; height: 100vh; overflow: auto; }
     main { padding: 18px; overflow: auto; }
     button, input[type="file"]::file-selector-button { border: 1px solid #8b7650; background: #fff1c9; color: #2d2618; border-radius: 10px; padding: 8px 10px; cursor: pointer; margin: 3px; }
@@ -168,6 +172,8 @@ function App() {
   const [layout, setLayout] = React.useState(loadInitialLayout);
   const [selectedId, setSelectedId] = React.useState(null);
   const [showLabels, setShowLabels] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  React.useEffect(() => { document.getElementById("root").classList.toggle("collapsed", !sidebarOpen); }, [sidebarOpen]);
   const [scale, setScale] = React.useState(0.7);
   const selected = layout.find(x => x.id === selectedId);
   const portrait = layout.find(x => x.id === "portraitFrame");
@@ -194,7 +200,9 @@ function App() {
     });
   }
   return e(React.Fragment, null,
+    !sidebarOpen ? e("button", { className: "sidebarToggle", onClick: () => setSidebarOpen(true), title: "Show sidebar" }, "☰ Menu") : null,
     e("aside", null,
+      e("button", { className: "collapseBtn", onClick: () => setSidebarOpen(false), title: "Collapse sidebar" }, "« Hide"),
       e("h2", null, "Bearington Sheet Layout"),
       e("p", { className: "hint" }, "Drag components inside the Sheet. Positions and sizes live in layout data and autosave to localStorage. ", e("a", { href: "layout-lab.html", style: { color: "#6f5c25" } }, "Layout Lab →")),
       e("div", { className: "row" },
