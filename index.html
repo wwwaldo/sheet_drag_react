@@ -21,7 +21,7 @@
     .sheet { position: relative; width: 1024px; height: 1536px; background: #efe0bc; box-shadow: 0 6px 28px #0004; overflow: hidden; transform-origin: top left; }
     .guide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 0; }
     .piece { position: absolute; z-index: 1; touch-action: none; user-select: none; border: 1px dashed transparent; border-radius: 4px; cursor: grab; }
-    .piece img { width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; }
+    .piece img { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; user-select: none; }
     .piece:hover { border-color: #7b682fcc; }
     .piece.selected { z-index: 5; border: 2px solid #6f5c25; box-shadow: 0 0 0 3px #fff7cfaa; cursor: grabbing; }
     .badge { position: absolute; left: 2px; top: 2px; background: #fff8eadc; border: 1px solid #7b682f; border-radius: 6px; padding: 2px 5px; font-size: 11px; pointer-events:none; }
@@ -49,7 +49,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script>
 const e = React.createElement;
-const STORAGE_KEY = "bearington-sheet-layout-v3";
+const STORAGE_KEY = "bearington-sheet-layout-v4";
 const WOODLAND_CREATURE_VARIANTS = [
   { label: "Variant A", src: "assets/woodland_cleric_card_variant_a.png" },
   { label: "Variant B", src: "assets/woodland_cleric_card_variant_b.png" }
@@ -71,7 +71,7 @@ const DEFAULT_LAYOUT = [
     "x": 205,
     "y": 250,
     "width": 500,
-    "height": 525
+    "height": 667
   }
 ];
 
