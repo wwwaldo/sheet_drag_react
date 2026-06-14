@@ -172,7 +172,7 @@ function App() {
   const [layout, setLayout] = React.useState(loadInitialLayout);
   const [selectedId, setSelectedId] = React.useState(null);
   const [showLabels, setShowLabels] = React.useState(true);
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   React.useEffect(() => { document.getElementById("root").classList.toggle("collapsed", !sidebarOpen); }, [sidebarOpen]);
   const [scale, setScale] = React.useState(0.7);
   const selected = layout.find(x => x.id === selectedId);
