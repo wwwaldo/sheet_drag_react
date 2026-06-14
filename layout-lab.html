@@ -252,7 +252,7 @@ function App() {
 
   const sidebar = e("aside", null,
     e("h2", null, "Layout Lab"),
-    e("p", { className: "hint" }, "Load an image, draw regions over it, then segment it into PNG pieces you can drag around. ", e("a", { href: "index.html" }, "Bearington demo →")),
+    e("p", { className: "hint" }, "Load an image, draw regions over it, then segment it into PNG pieces you can drag around. ", e("a", { href: "index.html" }, "Bearington demo →"), " ", e("a", { href: "map-maker.html" }, "Map Maker →")),
 
     e("h3", null, "1 · Source image"),
     e("label", null, e("input", { type: "file", accept: "image/png,image/jpeg,image/svg+xml,image/webp", onChange: onImageFile })),

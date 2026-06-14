@@ -159,7 +159,7 @@ function App() {
     e("aside", null,
       e("button", { className: "collapseBtn", onClick: () => setSidebarOpen(false), title: "Collapse sidebar" }, "« Hide"),
       e("h2", null, "Bearington Character Sheet"),
-      e("p", { className: "hint" }, "Click a line and type. ", e("strong", null, "Shift+drag"), " a field to move it. Text, positions, and portrait autosave to this browser. ", e("a", { href: "layout-lab.html" }, "Layout Lab →")),
+      e("p", { className: "hint" }, "Click a line and type. ", e("strong", null, "Shift+drag"), " a field to move it. Text, positions, and portrait autosave to this browser. ", e("a", { href: "layout-lab.html" }, "Layout Lab →"), " ", e("a", { href: "map-maker.html" }, "Map Maker →")),
       e("h3", null, "Character Portrait"),
       e("p", { className: "hint" }, "Choose the portrait shown in the sheet frame."),
       e(VariantPicker, { variants: VARIANTS, value: portraitSrc, onChange: setPortraitSrc }),

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Map Maker — a lil isometric cube map maker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4ecd9; color: #2d2618; }
+    #root { min-height: 100vh; display: grid; grid-template-columns: 320px 1fr; }
+    aside { padding: 16px; background: #fff8ea; border-right: 1px solid #d8caa8; height: 100vh; overflow: auto; }
+    main { padding: 18px; overflow: auto; display: flex; align-items: flex-start; justify-content: center; }
+    h2 { margin: 0 0 4px; } h3 { margin: 16px 0 6px; }
+    a { color: #6f5c25; }
+    button, input[type="file"]::file-selector-button { border: 1px solid #8b7650; background: #fff1c9; color: #2d2618; border-radius: 10px; padding: 8px 10px; cursor: pointer; margin: 3px 3px 3px 0; font: inherit; }
+    button:hover { background: #ffe6a3; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.primary { background: #d9c178; border-color: #6f5c25; font-weight: 600; }
+    .row { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 12px; }
+    .hint { font-size: 13px; opacity: .8; line-height: 1.4; }
+    label { display: block; margin: 9px 0; font-size: 14px; }
+    input[type="range"] { width: 100%; }
+    .seg { display: inline-flex; border: 1px solid #8b7650; border-radius: 10px; overflow: hidden; margin: 6px 0 10px; }
+    .seg button { border: 0; border-radius: 0; margin: 0; padding: 8px 14px; }
+    .seg button.on { background: #d9c178; font-weight: 600; }
+    .palette { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+    .swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border: 1px solid #d8caa8; border-radius: 10px; background: #fffdf5; cursor: pointer; width: 80px; margin: 0; font: inherit; }
+    .swatch .chip { width: 60px; height: 30px; border-radius: 6px; border: 1px solid #00000022; }
+    .swatch span { font-size: 11px; opacity: .82; }
+    .swatch:hover { background: #ffe6a3; }
+    .swatch.active { outline: 2px solid #8b7650; border-color: #8b7650; background: #ffe6a3; }
+    .stageWrap { box-shadow: 0 6px 28px #0004; border-radius: 6px; background: #efe0bc; padding: 6px; }
+    .stageSvg { display: block; touch-action: none; cursor: crosshair; }
+    body.painting, body.painting * { user-select: none !important; }
+    @media (max-width: 900px) { #root { grid-template-columns: 1fr; } aside { height: auto; } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script>
+const e = React.createElement;
+const STORAGE_KEY = "map-maker-state-v1";
+
+const GRID = 16;            // tiles per side
+const TILE_W = 44;          // half-width of a diamond tile (full width = 2*TILE_W)
+const TILE_H = 22;          // half-height of a diamond tile
+const CUBE_H = 26;          // pixel height of one cube level
+const MAX_H = 8;            // max stack height
+
+// Cube palette. Each material has a top/left/right face color for a faux-3D look.
+const MATERIALS = [
+  { id: "grass", label: "Grass", top: "#8fc05a", left: "#5f8c39", right: "#74a847" },
+  { id: "stone", label: "Stone", top: "#b9b3a4", left: "#807a6c", right: "#9c968a" },
+  { id: "water", label: "Water", top: "#6fb6d8", left: "#3f7fa0", right: "#549dc1" },
+  { id: "sand",  label: "Sand",  top: "#e6cf8f", left: "#bfa362", right: "#d3bb78" },
+  { id: "wood",  label: "Wood",  top: "#c08a4e", left: "#8a5e30", right: "#a87440" },
+  { id: "brick", label: "Brick", top: "#c0644e", left: "#8a3f30", right: "#a85240" },
+];
+const MAT_BY_ID = Object.fromEntries(MATERIALS.map(m => [m.id, m]));
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const key = (c, r) => c + "," + r;
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+}
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function downloadJSON(name, data) {
+  download(name, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+}
+
+// World geometry: total iso footprint size + an origin offset so the whole map fits.
+const ISO_W = (GRID + GRID) * TILE_W;                 // widest extent
+const ORIGIN_X = GRID * TILE_W;                        // center horizontally
+const ORIGIN_Y = TILE_H * 2 + MAX_H * CUBE_H;         // top padding for tall stacks
+const SVG_W = ISO_W;
+const SVG_H = (GRID + GRID) * TILE_H + ORIGIN_Y + TILE_H * 2;
+
+// Screen position of the *top* center of a tile's ground (height 0).
+function tileTop(c, r) {
+  return {
+    x: ORIGIN_X + (c - r) * TILE_W,
+    y: ORIGIN_Y + (c + r) * TILE_H,
+  };
+}
+
+// Build the path strings for a single cube whose top sits at (cx, cy) with the
+// given number of vertical levels (height). Returns {top,left,right} polygon points.
+function cubeFaces(cx, cy, height) {
+  const lift = height * CUBE_H;           // total visible side height
+  const topY = cy - lift;                 // top diamond raised by stack height
+  // top diamond
+  const top = [
+    [cx, topY - TILE_H],
+    [cx + TILE_W, topY],
+    [cx, topY + TILE_H],
+    [cx - TILE_W, topY],
+  ];
+  // left face (cx-TILE_W,topY) -> (cx,topY+TILE_H) down by lift
+  const left = [
+    [cx - TILE_W, topY],
+    [cx, topY + TILE_H],
+    [cx, topY + TILE_H + lift],
+    [cx - TILE_W, topY + lift],
+  ];
+  const right = [
+    [cx + TILE_W, topY],
+    [cx, topY + TILE_H],
+    [cx, topY + TILE_H + lift],
+    [cx + TILE_W, topY + lift],
+  ];
+  const pts = (a) => a.map(p => p.join(",")).join(" ");
+  return { top: pts(top), left: pts(left), right: pts(right), topY };
+}
+
+function Cube({ c, r, cell }) {
+  const { x, y } = tileTop(c, r);
+  const mat = MAT_BY_ID[cell.mat] || MATERIALS[0];
+  const f = cubeFaces(x, y, cell.h);
+  return e("g", { className: "cube" },
+    e("polygon", { points: f.left, fill: mat.left, stroke: "#00000022", strokeWidth: 0.5 }),
+    e("polygon", { points: f.right, fill: mat.right, stroke: "#00000022", strokeWidth: 0.5 }),
+    e("polygon", { points: f.top, fill: mat.top, stroke: "#00000033", strokeWidth: 0.5 })
+  );
+}
+
+// Ground diamond used for empty tiles (clickable target + subtle grid).
+function GroundTile({ c, r }) {
+  const { x, y } = tileTop(c, r);
+  const pts = [
+    [x, y - TILE_H], [x + TILE_W, y], [x, y + TILE_H], [x - TILE_W, y],
+  ].map(p => p.join(",")).join(" ");
+  const shade = (c + r) % 2 === 0 ? "#e7d6ad" : "#ddc99c";
+  return e("polygon", { points: pts, fill: shade, stroke: "#c9b585", strokeWidth: 0.5 });
+}
+
+function App() {
+  const saved = loadState();
+  const [cells, setCells] = React.useState(() => (saved && saved.cells) || {}); // key -> {h, mat}
+  const [material, setMaterial] = React.useState(() => (saved && saved.material) || "grass");
+  const [tool, setTool] = React.useState("stack"); // stack | erase
+  const [scale, setScale] = React.useState(() => (saved && saved.scale) || 0.8);
+  const painting = React.useRef(false);
+  const touched = React.useRef(new Set()); // tiles already changed during this drag stroke
+  const svgRef = React.useRef(null);
+  const fileRef = React.useRef(null);
+
+  // Autosave
+  React.useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ cells, material, scale }));
+  }, [cells, material, scale]);
+
+  // Apply the current tool to a tile. "once" gates per-stroke so drag paints
+  // each tile a single time (so a drag raises height by 1, not by dozens).
+  function applyTo(c, r, opts) {
+    const k = key(c, r);
+    if (opts && opts.stroke) {
+      if (touched.current.has(k)) return;
+      touched.current.add(k);
+    }
+    setCells(prev => {
+      const next = { ...prev };
+      const cur = next[k];
+      if (tool === "erase" || (opts && opts.lower)) {
+        if (!cur) return prev;
+        const nh = cur.h - 1;
+        if (nh <= 0) delete next[k]; else next[k] = { h: nh, mat: cur.mat };
+        return next;
+      }
+      // stack tool
+      if (!cur) { next[k] = { h: 1, mat: material }; }
+      else if (cur.mat !== material) { next[k] = { h: cur.h, mat: material }; } // recolor, keep height
+      else { next[k] = { h: clamp(cur.h + 1, 1, MAX_H), mat: material }; }
+      return next;
+    });
+  }
+
+  // Convert a pointer position to the topmost tile under it. We hit-test each
+  // tile's top diamond from front (high c+r) to back so taller/closer cubes win.
+  function tileAt(ev) {
+    const r0 = svgRef.current.getBoundingClientRect();
+    const px = (ev.clientX - r0.left) / scale;
+    const py = (ev.clientY - r0.top) / scale;
+    let best = null, bestDepth = -1;
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const k = key(c, r);
+        const cell = cells[k];
+        const { x, y } = tileTop(c, r);
+        const lift = cell ? cell.h * CUBE_H : 0;
+        const cy = y - lift;
+        // point-in-diamond test for the (possibly raised) top face
+        const dx = Math.abs(px - x) / TILE_W;
+        const dy = Math.abs(py - cy) / TILE_H;
+        if (dx + dy <= 1) {
+          const depth = (c + r) * 100 + lift; // closer + taller wins
+          if (depth > bestDepth) { bestDepth = depth; best = { c, r }; }
+        }
+      }
+    }
+    return best;
+  }
+
+  function onDown(ev) {
+    ev.preventDefault();
+    const t = tileAt(ev);
+    if (!t) return;
+    painting.current = true;
+    touched.current = new Set();
+    document.body.classList.add("painting");
+    svgRef.current.setPointerCapture(ev.pointerId);
+    const lower = ev.shiftKey || ev.button === 2;
+    applyTo(t.c, t.r, { stroke: true, lower });
+  }
+  function onMove(ev) {
+    if (!painting.current) return;
+    const t = tileAt(ev);
+    if (!t) return;
+    const lower = ev.shiftKey || (ev.buttons & 2);
+    applyTo(t.c, t.r, { stroke: true, lower });
+  }
+  function onUp() {
+    painting.current = false;
+    touched.current = new Set();
+    document.body.classList.remove("painting");
+  }
+
+  function clearMap() { if (confirm("Clear the whole map?")) setCells({}); }
+
+  function exportJSON() {
+    const tiles = Object.entries(cells).map(([k, v]) => {
+      const [c, r] = k.split(",").map(Number);
+      return { c, r, h: v.h, mat: v.mat };
+    });
+    downloadJSON("map.json", { grid: GRID, tiles });
+  }
+  function importJSON(ev) {
+    const f = ev.target.files[0]; if (!f) return;
+    f.text().then(txt => {
+      const data = JSON.parse(txt);
+      const arr = Array.isArray(data) ? data : data.tiles;
+      const next = {};
+      arr.forEach(t => {
+        if (t.c == null || t.r == null) return;
+        next[key(t.c, t.r)] = { h: clamp(t.h || 1, 1, MAX_H), mat: MAT_BY_ID[t.mat] ? t.mat : "grass" };
+      });
+      setCells(next);
+    }).catch(() => alert("Could not read that map JSON."));
+    ev.target.value = "";
+  }
+
+  // Export PNG by serializing the live SVG to an image and painting it on a canvas.
+  function exportPNG() {
+    const svg = svgRef.current;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const svg64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = SVG_W; canvas.height = SVG_H;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#efe0bc";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(b => download("map.png", b), "image/png");
+    };
+    img.onerror = () => alert("PNG export failed.");
+    img.src = svg64;
+  }
+
+  // Render order: draw tiles back-to-front so closer cubes overlap farther ones.
+  const order = [];
+  for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) order.push([c, r]);
+
+  const tileCount = Object.keys(cells).length;
+  const cubeCount = Object.values(cells).reduce((s, v) => s + v.h, 0);
+
+  const sidebar = e("aside", null,
+    e("h2", null, "Map Maker"),
+    e("p", { className: "hint" }, "A lil isometric cube map maker. Click a tile to drop a cube; click again to stack it higher. Drag to paint. ",
+      e("a", { href: "index.html" }, "Bearington →"), " ", e("a", { href: "layout-lab.html" }, "Layout Lab →")),
+
+    e("h3", null, "Tool"),
+    e("div", { className: "seg" },
+      e("button", { className: tool === "stack" ? "on" : "", onClick: () => setTool("stack") }, "Build"),
+      e("button", { className: tool === "erase" ? "on" : "", onClick: () => setTool("erase") }, "Eraser")
+    ),
+    e("p", { className: "hint" }, "Build: click to add / stack. ", e("strong", null, "Shift-click"), " (or right-click) to lower a stack. Eraser removes a level."),
+
+    e("h3", null, "Material"),
+    e("div", { className: "palette" },
+      MATERIALS.map(m => e("button", {
+        key: m.id, type: "button", title: m.label,
+        className: "swatch" + (m.id === material ? " active" : ""),
+        "aria-pressed": m.id === material,
+        onClick: () => { setMaterial(m.id); if (tool === "erase") setTool("stack"); },
+      },
+        e("div", { className: "chip", style: { background: m.top } }),
+        e("span", null, m.label)
+      ))
+    ),
+
+    e("h3", null, "Map"),
+    e("div", { className: "row" },
+      e("button", { onClick: clearMap }, "Clear map")
+    ),
+    e("label", null, `Zoom ${scale.toFixed(2)}×`,
+      e("input", { type: "range", min: 0.4, max: 1.4, step: 0.05, value: scale, onChange: ev => setScale(Number(ev.target.value)) })),
+
+    e("h3", null, "Export / Import"),
+    e("div", { className: "row" },
+      e("button", { className: "primary", onClick: exportPNG }, "Download PNG"),
+      e("button", { onClick: exportJSON }, "Export JSON"),
+      e("button", { onClick: () => fileRef.current.click() }, "Import JSON"),
+      e("input", { type: "file", accept: "application/json", ref: fileRef, style: { display: "none" }, onChange: importJSON })
+    ),
+    e("p", { className: "hint" }, `${tileCount} tiles · ${cubeCount} cubes · ${GRID}×${GRID} grid. Autosaves to this browser.`)
+  );
+
+  const stage = e("div", { className: "stageWrap", style: { width: SVG_W * scale + 12, height: SVG_H * scale + 12 } },
+    e("svg", {
+      ref: svgRef, className: "stageSvg",
+      width: SVG_W * scale, height: SVG_H * scale,
+      viewBox: `0 0 ${SVG_W} ${SVG_H}`, xmlns: "http://www.w3.org/2000/svg",
+      onPointerDown: onDown, onPointerMove: onMove, onPointerUp: onUp, onPointerCancel: onUp,
+      onContextMenu: ev => ev.preventDefault(),
+    },
+      // ground grid first
+      order.map(([c, r]) => e(GroundTile, { key: "g" + key(c, r), c, r })),
+      // then cubes back-to-front
+      order.map(([c, r]) => {
+        const cell = cells[key(c, r)];
+        return cell ? e(Cube, { key: "c" + key(c, r), c, r, cell }) : null;
+      })
+    )
+  );
+
+  return e(React.Fragment, null, sidebar, e("main", null, stage));
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+</script>
+</body>
+</html>
