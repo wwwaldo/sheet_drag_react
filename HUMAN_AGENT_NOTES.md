@@ -23,7 +23,20 @@ Two ways:
   localStorage `bearington-outer-layout-v1`; "Reset positions" in the sidebar clears them.
   Drag math uses the SVG `getScreenCTM()` so it's correct at any zoom.
 - **In code:** edit `index.html` — a field's default `{x,y,w,h}` in the `FIELDS` array, or
-  the `PORTRAIT` constant. (Code defaults; a saved drag layout overrides them per-browser.)
+  the `PORTRAIT` constant.
+
+### Position precedence (which wins)
+`localStorage (per-user drags)` → `field-layout.json (committed site default)` → `FIELDS code defaults`.
+
+### Publishing positions site-wide ("save to website")
+localStorage is per-browser, so to make a layout the default for ALL visitors:
+1. Drag fields to taste, click **Export positions** in the sidebar → downloads `field-layout.json`
+   (every field's current x/y).
+2. Commit that file to the repo root and push. On load the page `fetch`es `field-layout.json`
+   and uses it as the default layout for any client (overridden only by that client's own drags).
+3. **Import positions** loads a JSON back into localStorage to preview before committing.
+There is no backend — publishing = committing the file (the "via clood code" loop: user exports,
+hands the JSON to an agent, agent commits `field-layout.json` and pushes).
 The `FIELDS` array was generated from `outer.svg`'s `<g class="field" data-id data-default-x/y>`
 groups (x,y already include the hitbox offset: `x = default-x - 4`, `y = default-y - 22`,
 w=270/h=26 typical). The viewBox height is 1630 because the field coords were authored in a
