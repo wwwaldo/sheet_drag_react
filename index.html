@@ -35,6 +35,7 @@
     .fieldInput::placeholder { color: rgba(47,42,22,0.34); }
     .fieldInput:hover { background: rgba(255,255,255,0.16); }
     .fieldInput:focus { background: rgba(255,255,255,0.28); box-shadow: 0 0 0 1px rgba(65,77,35,0.55); border-radius: 3px; }
+    body.dragging, body.dragging * { cursor: grabbing !important; user-select: none !important; }
     @media (max-width: 900px) { #root { grid-template-columns: 1fr; } aside { height: auto; } }
   </style>
 </head>
@@ -65,30 +66,32 @@ function VariantPicker({ variants, value, onChange }) {
   );
 }
 
-function svgPoint(ev) {
-  const svg = ev.currentTarget.ownerSVGElement;
-  const pt = svg.createSVGPoint();
-  pt.x = ev.clientX; pt.y = ev.clientY;
-  return pt.matrixTransform(svg.getScreenCTM().inverse());
-}
-
 function Field({ f, pos, value, setValue, setFieldPos }) {
-  const drag = React.useRef(null);
   function down(ev) {
     if (!ev.shiftKey) return;            // plain click -> focus & type
     ev.preventDefault(); ev.stopPropagation();
-    const p = svgPoint(ev);
-    drag.current = { sx: p.x, sy: p.y, ox: pos.x, oy: pos.y };
-    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (err) {}
+    const svg = ev.currentTarget.ownerSVGElement;
+    const toUser = (cx, cy) => {
+      const pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    };
+    const start = toUser(ev.clientX, ev.clientY);
+    const orig = { x: pos.x, y: pos.y };
+    document.body.classList.add("dragging");
+    function move(e) {
+      const p = toUser(e.clientX, e.clientY);
+      setFieldPos(f.id, Math.round(orig.x + (p.x - start.x)), Math.round(orig.y + (p.y - start.y)));
+      e.preventDefault();
+    }
+    function up() {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      document.body.classList.remove("dragging");
+    }
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
   }
-  function move(ev) {
-    const d = drag.current; if (!d) return;
-    const p = svgPoint(ev);
-    setFieldPos(f.id, Math.round(d.ox + (p.x - d.sx)), Math.round(d.oy + (p.y - d.sy)));
-  }
-  function up() { drag.current = null; }
-  return e("g", { transform: `translate(${pos.x},${pos.y})`, className: "fieldG",
-      onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up },
+  return e("g", { transform: `translate(${pos.x},${pos.y})`, className: "fieldG", onPointerDown: down },
     e("foreignObject", { x: 0, y: 0, width: f.w, height: f.h },
       e("input", { className: "fieldInput", type: "text", value: value || "", placeholder: f.label,
         title: f.label + " — Shift+drag to move", onChange: ev => setValue(f.id, ev.target.value) })
