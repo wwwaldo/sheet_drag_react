@@ -19,7 +19,6 @@
     .coords { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; opacity: .72; grid-column: 1 / -1; }
     .stageOuter { width: max-content; }
     .sheet { position: relative; width: 1024px; height: 1536px; background: #efe0bc; box-shadow: 0 6px 28px #0004; overflow: hidden; transform-origin: top left; }
-    .guide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 0; }
     .piece { position: absolute; z-index: 1; touch-action: none; user-select: none; border: 1px dashed transparent; border-radius: 4px; cursor: grab; }
     .piece img { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; user-select: none; }
     .piece:hover { border-color: #7b682fcc; }
@@ -154,13 +153,12 @@ function SheetPiece({ item, selected, showLabels, variants, onVariant, onSelect,
   );
 }
 
-function Sheet({ layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale, variantsById, onVariant }) {
+function Sheet({ layout, setLayout, selectedId, setSelectedId, showLabels, scale, variantsById, onVariant }) {
   function move(id, x, y) { setLayout(prev => prev.map(it => it.id === id ? { ...it, x, y } : it)); }
   function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); }
   React.useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); }, [layout]);
   return e("div", { className: "stageOuter", style: { transform: `scale(${scale})`, transformOrigin: "top left" } },
     e("div", { className: "sheet", onPointerDown: () => setSelectedId(null) },
-      e("img", { className: "guide", src: "assets/full-sheet-guide.jpg", style: { opacity: guideOpacity }, alt: "Full sheet background guide" }),
       layout.map(item => e(SheetPiece, { key: item.id, item, selected: selectedId === item.id, showLabels, variants: variantsById[item.id], onVariant, onSelect: setSelectedId, onMove: move, onUpdate: save }))
     )
   );
@@ -169,7 +167,6 @@ function Sheet({ layout, setLayout, selectedId, setSelectedId, guideOpacity, sho
 function App() {
   const [layout, setLayout] = React.useState(loadInitialLayout);
   const [selectedId, setSelectedId] = React.useState(null);
-  const [guideOpacity, setGuideOpacity] = React.useState(0.28);
   const [showLabels, setShowLabels] = React.useState(true);
   const [scale, setScale] = React.useState(0.7);
   const selected = layout.find(x => x.id === selectedId);
@@ -206,7 +203,6 @@ function App() {
         e("button", { onClick: () => localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)) }, "Save Now")
       ),
       e("label", null, "Import Layout JSON ", e("input", { type: "file", accept: "application/json", onChange: importFile })),
-      e("label", null, "Background guide opacity ", e("input", { type: "range", min: 0, max: 1, step: 0.01, value: guideOpacity, onChange: ev => setGuideOpacity(Number(ev.target.value)) })),
       e("label", null, "Canvas zoom ", e("input", { type: "range", min: 0.25, max: 1.25, step: 0.05, value: scale, onChange: ev => setScale(Number(ev.target.value)) })),
       e("label", null, e("input", { type: "checkbox", checked: showLabels, onChange: ev => setShowLabels(ev.target.checked) }), " Show labels"),
       e("h3", null, "Woodland Creature"),
@@ -226,7 +222,7 @@ function App() {
       ))
     ),
     e("main", null,
-      e(Sheet, { layout, setLayout, selectedId, setSelectedId, guideOpacity, showLabels, scale, variantsById, onVariant: cycleVariant })
+      e(Sheet, { layout, setLayout, selectedId, setSelectedId, showLabels, scale, variantsById, onVariant: cycleVariant })
     )
   );
 }
