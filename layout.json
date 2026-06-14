@@ -37,8 +37,8 @@
   },
   {
     "id": "portraitFrame",
-    "label": "05 Portrait Frame",
-    "src": "assets/05_portrait_frame.png",
+    "label": "05 Woodland Creature",
+    "src": "assets/woodland_cleric_card_variant_a.png",
     "x": 205,
     "y": 250,
     "width": 500,

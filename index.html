@@ -27,6 +27,7 @@
     .badge { position: absolute; left: 2px; top: 2px; background: #fff8eadc; border: 1px solid #7b682f; border-radius: 6px; padding: 2px 5px; font-size: 11px; pointer-events:none; }
     label { display: block; margin: 9px 0; }
     input[type="range"] { width: 100%; }
+    select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d8caa8; background: #fffdf5; color: #2d2618; font: inherit; }
     .resizePanel { display:grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
     .resizePanel input { width: 100%; padding: 6px; border-radius: 8px; border: 1px solid #d8caa8; background:#fffdf5; }
     @media (max-width: 900px) { #root { grid-template-columns: 1fr; } aside { height: auto; border-right: 0; border-bottom: 1px solid #d8caa8; } }
@@ -39,6 +40,10 @@
 <script>
 const e = React.createElement;
 const STORAGE_KEY = "bearington-sheet-layout-v1";
+const WOODLAND_CREATURE_VARIANTS = [
+  { label: "Variant A", src: "assets/woodland_cleric_card_variant_a.png" },
+  { label: "Variant B", src: "assets/woodland_cleric_card_variant_b.png" }
+];
 const DEFAULT_LAYOUT = [
   {
     "id": "header",
@@ -78,8 +83,8 @@ const DEFAULT_LAYOUT = [
   },
   {
     "id": "portraitFrame",
-    "label": "05 Portrait Frame",
-    "src": "assets/05_portrait_frame.png",
+    "label": "05 Woodland Creature",
+    "src": "assets/woodland_cleric_card_variant_a.png",
     "x": 205,
     "y": 250,
     "width": 500,
@@ -174,8 +179,22 @@ function downloadJSON(filename, data) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }
+function normalizeLayout(layout) {
+  return layout.map(item => {
+    if (item.id !== "portraitFrame") return item;
+    const selectedVariant = WOODLAND_CREATURE_VARIANTS.find(variant => variant.src === item.src);
+    return {
+      ...item,
+      label: "05 Woodland Creature",
+      src: selectedVariant ? selectedVariant.src : WOODLAND_CREATURE_VARIANTS[0].src
+    };
+  });
+}
 function loadInitialLayout() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_LAYOUT; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return saved ? normalizeLayout(saved) : DEFAULT_LAYOUT;
+  }
   catch { return DEFAULT_LAYOUT; }
 }
 
@@ -233,7 +252,11 @@ function App() {
   function patchSelected(patch) { if (!selected) return; setLayout(prev => prev.map(it => it.id === selected.id ? { ...it, ...patch } : it)); }
   function importFile(ev) {
     const file = ev.target.files[0]; if (!file) return;
-    file.text().then(text => { const data = JSON.parse(text); setLayout(data); localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); });
+    file.text().then(text => {
+      const data = normalizeLayout(JSON.parse(text));
+      setLayout(data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    });
   }
   return e(React.Fragment, null,
     e("aside", null,
@@ -250,6 +273,14 @@ function App() {
       e("label", null, e("input", { type: "checkbox", checked: showLabels, onChange: ev => setShowLabels(ev.target.checked) }), " Show labels"),
       selected ? e("div", null,
         e("h3", null, "Selected: ", selected.label),
+        selected.id === "portraitFrame" ? e("label", null, "Woodland creature artwork ",
+          e("select", {
+            value: selected.src,
+            onChange: ev => patchSelected({ src: ev.target.value })
+          }, WOODLAND_CREATURE_VARIANTS.map(variant =>
+            e("option", { key: variant.src, value: variant.src }, variant.label)
+          ))
+        ) : null,
         e("div", { className: "resizePanel" },
           ["x","y","width","height"].map(key => e("label", { key }, key, e("input", { type:"number", value:selected[key], onChange: ev => patchSelected({ [key]: Number(ev.target.value) }) })))
         )
